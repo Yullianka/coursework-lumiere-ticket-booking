@@ -1,6 +1,6 @@
 # Lumière API
 
-Express and TypeScript server package with booking domain patterns.
+Express and TypeScript server package with booking domain patterns and PostgreSQL setup.
 
 ## Requirements and setup
 
@@ -26,15 +26,16 @@ Override it with an environment variable:
 PORT=3002 npm run dev
 ```
 
-`.env.example` documents configuration values. The server does not automatically
-load `.env` files. `DATABASE_URL` is reserved for the later PostgreSQL integration.
+Copy `.env.example` to `.env` and set `DATABASE_URL` for a dedicated PostgreSQL
+database. Development, start and database commands load `.env` automatically
+from this package directory. Existing shell variables take precedence.
 
 ## Current API
 
 `GET /api/health` returns HTTP 200:
 
 ```json
-{"status":"ok","service":"lumiere-api","stage":"foundation","database":"not-connected"}
+{"status":"ok","service":"lumiere-api","stage":"database-foundation"}
 ```
 
 Unknown routes return a JSON 404 error. Malformed JSON returns 400, and JSON
@@ -42,7 +43,7 @@ request bodies above 32 KB return 413. Internal errors return a generic JSON 500
 response. SIGINT and SIGTERM stop the HTTP server gracefully.
 
 The booking domain is implemented and exercised by tests. Authentication,
-PostgreSQL persistence and booking HTTP routes are not implemented yet.
+the PostgreSQL booking repository and booking HTTP routes are not implemented yet.
 
 ## Files
 
@@ -87,3 +88,25 @@ Subscriber errors are returned in `observerFailures`; callers must inspect them.
 These errors do not turn a saved change into a failed operation. Delivery is
 in-process; durable delivery and an expiration scheduler are future integration
 work. Expiration currently runs through the explicit `expire` service method.
+
+## PostgreSQL
+
+See [database setup](../../database/README.md) for server/account setup, migration
+behavior, seed contents and dedicated database tests. Keep the repository layout
+when running database commands: SQL files live in the root `database` directory.
+
+```sh
+npm run db:check
+npm run db:migrate
+npm run db:seed
+npm run test:db
+```
+
+`test:db` requires `TEST_DATABASE_URL` pointing to a fresh empty disposable
+database ending in `_test`. Regular `npm test` does not require PostgreSQL.
+
+`GET /api/health` reports process liveness. `GET /api/ready` executes `SELECT 1`
+against PostgreSQL and returns 200 when connected, or 503 when the connection
+is unavailable or unconfigured. It checks connectivity, not migration status.
+The API can start without a database; readiness will report not configured.
+Migrations and demo seeds never run automatically on server startup.
