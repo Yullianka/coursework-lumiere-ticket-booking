@@ -32,11 +32,15 @@ export function createApp(databaseReady?: () => Promise<void>) {
       return;
     }
     if (error?.type === 'entity.too.large') {
-      response.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Запит завеликий.' } });
+      response
+        .status(413)
+        .json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Запит завеликий.' } });
       return;
     }
     console.error(error);
-    response.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Внутрішня помилка сервера.' } });
+    response
+      .status(500)
+      .json({ error: { code: 'INTERNAL_ERROR', message: 'Внутрішня помилка сервера.' } });
   };
   app.use(handleError);
 

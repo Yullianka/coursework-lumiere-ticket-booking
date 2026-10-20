@@ -18,7 +18,9 @@ export interface DiscountStrategy {
 
 export class NoDiscount implements DiscountStrategy {
   readonly name = 'NONE';
-  discount(): number { return 0; }
+  discount(): number {
+    return 0;
+  }
 }
 
 export class StudentDiscount implements DiscountStrategy {
@@ -35,10 +37,14 @@ export class PromoDiscount implements DiscountStrategy {
     if (!Number.isInteger(promo.percent) || promo.percent < 1 || promo.percent > 100) {
       throw new Error('Promotion percentage must be between 1 and 100.');
     }
-    if (!Number.isFinite(promo.validFrom) || !Number.isFinite(promo.validTo) || promo.validTo <= promo.validFrom) {
+    if (
+      !Number.isFinite(promo.validFrom) ||
+      !Number.isFinite(promo.validTo) ||
+      promo.validTo <= promo.validFrom
+    ) {
       throw new Error('Invalid promotion validity period.');
     }
-    return Math.round(basePrice * promo.percent / 100);
+    return Math.round((basePrice * promo.percent) / 100);
   }
 }
 
@@ -51,7 +57,13 @@ export interface Price {
 
 export class PricingService {
   private readonly strategies: readonly DiscountStrategy[];
-  constructor(strategies: readonly DiscountStrategy[] = [new NoDiscount(), new StudentDiscount(), new PromoDiscount()]) {
+  constructor(
+    strategies: readonly DiscountStrategy[] = [
+      new NoDiscount(),
+      new StudentDiscount(),
+      new PromoDiscount(),
+    ],
+  ) {
     this.strategies = [...strategies];
   }
 
@@ -68,8 +80,16 @@ export class PricingService {
       if (!Number.isSafeInteger(discount) || discount < 0 || discount > basePrice) {
         throw new Error('Discount strategy returned an invalid amount.');
       }
-      if (discount > best) { best = discount; name = strategy.name; }
+      if (discount > best) {
+        best = discount;
+        name = strategy.name;
+      }
     }
-    return Object.freeze({ basePriceKopecks: basePrice, discountKopecks: best, finalPriceKopecks: basePrice - best, discountName: name });
+    return Object.freeze({
+      basePriceKopecks: basePrice,
+      discountKopecks: best,
+      finalPriceKopecks: basePrice - best,
+      discountName: name,
+    });
   }
 }
