@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
+    "dev": "tsx watch --exclude \"../../.local/**\" --env-file-if-exists=.env src/server.ts",
     "check": "tsc --noEmit && tsc -p tsconfig.test.json",
     "build": "tsc",
     "start": "node --env-file-if-exists=.env dist/server.js",
@@ -12,11 +12,15 @@
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts migrate",
     "db:seed": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts seed",
     "db:check": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts check",
-    "test:db": "node --env-file-if-exists=.env --import tsx --test test/database/*.test.ts"
+    "test:db": "node --env-file-if-exists=.env --import tsx --test test/database/*.test.ts",
+    "admin:create": "node --env-file-if-exists=.env --import tsx src/scripts/create-admin.ts",
+    "test:http": "node --env-file-if-exists=.env --import tsx --test test/http/*.test.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
-    "pg": "^8.23.1"
+    "express-rate-limit": "^8.7.4",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
