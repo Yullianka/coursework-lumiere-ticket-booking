@@ -27,10 +27,10 @@ test('PostgreSQL migrations, seed and constraints', async (t) => {
     );
     await t.test('concurrent migration calls apply the schema exactly once', async () => {
       const results = await Promise.all([migrate(pool), migrate(pool)]);
-      assert.equal(results.flat().length, 1);
+      assert.equal(results.flat().length, 2);
       assert.deepEqual(await migrate(pool), []);
       const tables = await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public'");
-      assert.equal(tables.rowCount, 12);
+      assert.equal(tables.rowCount, 14);
     });
     await t.test('seed is repeatable and builds complete seat inventory', async () => {
       await seed(pool);
@@ -172,7 +172,11 @@ test('PostgreSQL migrations, seed and constraints', async (t) => {
         await readFile(new URL('001_initial.sql', databaseDirectory)),
       );
       await writeFile(
-        new URL('002_failure.sql', dir),
+        new URL('002_auth_and_audit.sql', dir),
+        await readFile(new URL('002_auth_and_audit.sql', databaseDirectory)),
+      );
+      await writeFile(
+        new URL('003_failure.sql', dir),
         'CREATE TABLE failure_probe(id int); SELECT * FROM nonexistent_migration_table;',
       );
       await assert.rejects(migrate(pool, dir));
@@ -180,7 +184,7 @@ test('PostgreSQL migrations, seed and constraints', async (t) => {
         (await pool.query("SELECT to_regclass('failure_probe') AS name")).rows[0].name,
         null,
       );
-      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 1);
+      assert.equal((await pool.query('SELECT * FROM schema_migrations')).rowCount, 2);
       await writeFile(new URL('001_initial.sql', dir), '-- changed');
       await assert.rejects(migrate(pool, dir), /missing or changed/);
     });
