@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { PendingState, type BookingState, type BookingStatus } from './booking-state.js';
+import {
+  PaidState,
+  CancelledState,
+  ExpiredState,
+  PendingState,
+  type BookingState,
+  type BookingStatus,
+} from './booking-state.js';
 import type { Price } from './pricing.js';
 
 export interface BookingItem extends Price {
@@ -67,6 +74,25 @@ export class Booking {
       totalKopecks,
     });
     return new Booking(data, new PendingState());
+  }
+
+  /** Rehydrate a trusted database snapshot. */
+  static restore(snapshot: BookingSnapshot): Booking {
+    const { status, ...data } = snapshot;
+    const states = {
+      PENDING: new PendingState(),
+      PAID: new PaidState(),
+      CANCELLED: new CancelledState(),
+      EXPIRED: new ExpiredState(),
+    };
+    if (!states[status]) throw new Error('Invalid stored booking state.');
+    return new Booking(
+      Object.freeze({
+        ...data,
+        items: Object.freeze(data.items.map((item) => Object.freeze({ ...item }))),
+      }),
+      states[status],
+    );
   }
 
   get snapshot(): BookingSnapshot {
