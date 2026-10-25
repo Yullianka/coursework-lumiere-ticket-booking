@@ -1,3 +1,4 @@
+import { expireBookings } from './infrastructure/booking-repository.js';
 import { createApp } from './app.js';
 import { createDatabasePool } from './infrastructure/database.js';
 
@@ -12,7 +13,23 @@ const app = createApp(
         await pool.query('SELECT 1');
       }
     : undefined,
+  pool,
 );
+let expiring = false;
+const timer = pool
+  ? setInterval(async () => {
+      if (expiring) return;
+      expiring = true;
+      try {
+        await expireBookings(pool);
+      } catch {
+        console.error('Expiration sweep failed.');
+      } finally {
+        expiring = false;
+      }
+    }, 10000)
+  : undefined;
+timer?.unref();
 const server = app.listen(port, '127.0.0.1', () => {
   console.log(`Lumière API: http://localhost:${port}/api/health`);
 });
@@ -22,9 +39,10 @@ server.on('error', (error) => {
   void pool?.end();
 });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, () =>
+  process.once(signal, () => {
+    if (timer) clearInterval(timer);
     server.close(async () => {
       await pool?.end();
-    }),
-  );
+    });
+  });
 }
