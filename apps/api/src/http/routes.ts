@@ -133,5 +133,41 @@ export function apiRoutes(pool: DatabasePool): Router {
     res.clearCookie('lumiere_session', cookieOptions);
     res.status(204).end();
   });
+  router.get('/productions', async (_req, res) =>
+    res.json(
+      (await pool.query('SELECT * FROM productions WHERE NOT archived ORDER BY title LIMIT 200'))
+        .rows,
+    ),
+  );
+  router.get('/sessions', async (_req, res) => {
+    await expireBookings(pool);
+    res.json(
+      (
+        await pool.query(`SELECT s.*,p.title,p.description,p.type,p.duration_minutes,h.name AS hall_name,
+   (SELECT min(price_kopecks) FROM session_prices WHERE session_id=s.id) AS min_price,
+   (SELECT count(*)::int FROM session_seats WHERE session_id=s.id AND status='AVAILABLE') AS available
+   FROM sessions s JOIN productions p ON p.id=s.production_id JOIN halls h ON h.id=s.hall_id
+   WHERE s.starts_at>now() AND NOT s.archived AND NOT p.archived ORDER BY s.starts_at LIMIT 200`)
+      ).rows,
+    );
+  });
+  router.get('/sessions/:id/seats', async (req, res) => {
+    const sessionId = id.parse(req.params.id);
+    await expireBookings(pool);
+    const session = (
+      await pool.query(
+        `SELECT s.*,p.title,p.type,p.description,h.name AS hall_name FROM sessions s JOIN productions p ON p.id=s.production_id JOIN halls h ON h.id=s.hall_id WHERE s.id=$1 AND NOT s.archived AND NOT p.archived`,
+        [sessionId],
+      )
+    ).rows[0];
+    if (!session) throw new HttpError(404, 'Сеанс не знайдено.');
+    const seats = await pool.query(
+      `SELECT ss.seat_id AS id,ss.status,s.row_number,s.seat_number,s.category,p.price_kopecks
+   FROM session_seats ss JOIN seats s ON s.id=ss.seat_id JOIN session_prices p ON p.session_id=ss.session_id AND p.category=ss.category
+   WHERE ss.session_id=$1 ORDER BY s.row_number,s.seat_number`,
+      [sessionId],
+    );
+    res.json({ session, seats: seats.rows });
+  });
   return router;
 }
