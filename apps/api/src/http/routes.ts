@@ -169,5 +169,68 @@ export function apiRoutes(pool: DatabasePool): Router {
     );
     res.json({ session, seats: seats.rows });
   });
+  router.post('/bookings', requireUser, async (req, res) => {
+    const input = z
+      .object({
+        sessionId: id,
+        seatIds: z.array(id).min(1).max(8),
+        promoCode: z.string().trim().toUpperCase().max(32).optional(),
+      })
+      .parse(req.body);
+    if (new Set(input.seatIds).size !== input.seatIds.length)
+      throw new HttpError(400, 'Місця не можуть повторюватися.');
+    await expireBookings(pool);
+    const session = (
+      await pool.query(
+        'SELECT starts_at FROM sessions WHERE id=$1 AND NOT archived AND starts_at>now()',
+        [input.sessionId],
+      )
+    ).rows[0];
+    if (!session) throw new HttpError(404, 'Сеанс недоступний.');
+    const seats = (
+      await pool.query(
+        `SELECT ss.seat_id AS "seatId",p.price_kopecks AS "basePriceKopecks" FROM session_seats ss JOIN session_prices p ON p.session_id=ss.session_id AND p.category=ss.category WHERE ss.session_id=$1 AND ss.seat_id=ANY($2::uuid[])`,
+        [input.sessionId, input.seatIds],
+      )
+    ).rows;
+    if (seats.length !== input.seatIds.length) throw new HttpError(400, 'Некоректні місця.');
+    const { service } = bookingServices(pool, input.promoCode || undefined);
+    const result = await service.reserve({
+      userId: account(res).id,
+      sessionId: input.sessionId,
+      startsAt: new Date(session.starts_at).getTime(),
+      seats,
+      discount: await discountContext(pool, account(res).id, input.promoCode || undefined),
+    });
+    if (result.observerFailures.length) console.error('Booking audit failed.');
+    res.status(201).json(result.booking.snapshot);
+  });
+  router.get('/bookings/mine', requireUser, async (_req, res) => {
+    await expireBookings(pool);
+    res.json(
+      (
+        await pool.query(
+          `SELECT b.*,p.title,s.starts_at,h.name AS hall_name,
+   (SELECT coalesce(sum(final_price_kopecks),0)::int FROM booking_items WHERE booking_id=b.id) AS total_kopecks,
+   (SELECT json_agg(json_build_object('id',bi.id,'row',st.row_number,'seat',st.seat_number,'category',st.category,'price',bi.final_price_kopecks,'discount',bi.discount_name,'ticketId',t.id) ORDER BY st.row_number,st.seat_number)
+     FROM booking_items bi JOIN seats st ON st.id=bi.seat_id LEFT JOIN tickets t ON t.booking_item_id=bi.id WHERE bi.booking_id=b.id) AS items
+   FROM bookings b JOIN sessions s ON s.id=b.session_id JOIN productions p ON p.id=s.production_id JOIN halls h ON h.id=s.hall_id
+   WHERE b.user_id=$1 ORDER BY b.created_at DESC LIMIT 200`,
+          [account(res).id],
+        )
+      ).rows,
+    );
+  });
+  for (const action of ['pay', 'cancel'] as const)
+    router.post(`/bookings/:id/${action}`, requireUser, async (req, res) => {
+      await expireBookings(pool);
+      const { service, repository } = bookingServices(pool);
+      const booking = await repository.load(id.parse(req.params.id));
+      if (booking.snapshot.userId !== account(res).id)
+        throw new HttpError(403, 'Це бронювання належить іншому користувачу.');
+      const result = await service[action](account(res).id, booking);
+      if (result.observerFailures.length) console.error('Booking audit failed.');
+      res.json(result.booking.snapshot);
+    });
   return router;
 }
