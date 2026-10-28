@@ -331,5 +331,67 @@ export function apiRoutes(pool: DatabasePool): Router {
     if (!row) throw new HttpError(404, 'Зал не знайдено.');
     res.json(row);
   });
+  router.get('/admin/sessions', async (_req, res) =>
+    res.json(
+      (
+        await pool.query(
+          `SELECT s.*,p.title,h.name AS hall_name,(SELECT json_object_agg(category,price_kopecks) FROM session_prices WHERE session_id=s.id) AS prices FROM sessions s JOIN productions p ON p.id=s.production_id JOIN halls h ON h.id=s.hall_id ORDER BY starts_at DESC LIMIT 300`,
+        )
+      ).rows,
+    ),
+  );
+  const saveSession =
+    (update: boolean): RequestHandler =>
+    async (req, res) => {
+      const p = sessionSchema.parse(req.body),
+        key = update ? id.parse(req.params.id) : undefined;
+      if (new Date(p.startsAt).getTime() <= Date.now())
+        throw new HttpError(400, 'Початок сеансу має бути в майбутньому.');
+      const row = await inTransaction(pool, async (c) => {
+        await lockInventory(c);
+        const prod = (
+          await c.query('SELECT duration_minutes FROM productions WHERE id=$1 AND NOT archived', [
+            p.productionId,
+          ])
+        ).rows[0];
+        if (!prod) throw new HttpError(400, 'Подія недоступна.');
+        if (!(await c.query('SELECT 1 FROM seats WHERE hall_id=$1 LIMIT 1', [p.hallId])).rowCount)
+          throw new HttpError(400, 'Зал має містити місця.');
+        if (
+          key &&
+          (await c.query('SELECT 1 FROM bookings WHERE session_id=$1 LIMIT 1', [key])).rowCount
+        )
+          throw new HttpError(409, 'Сеанс з історією бронювань не можна змінювати.');
+        if (key) {
+          await c.query('DELETE FROM session_seats WHERE session_id=$1', [key]);
+          await c.query('DELETE FROM session_prices WHERE session_id=$1', [key]);
+        }
+        const end = new Date(new Date(p.startsAt).getTime() + prod.duration_minutes * 60000);
+        const result = key
+          ? await c.query(
+              'UPDATE sessions SET production_id=$1,hall_id=$2,starts_at=$3,ends_at=$4,archived=$5 WHERE id=$6 RETURNING *',
+              [p.productionId, p.hallId, p.startsAt, end, p.archived, key],
+            )
+          : await c.query(
+              'INSERT INTO sessions(production_id,hall_id,starts_at,ends_at,archived) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+              [p.productionId, p.hallId, p.startsAt, end, p.archived],
+            );
+        const s = result.rows[0];
+        if (!s) throw new HttpError(404, 'Сеанс не знайдено.');
+        for (const category of ['STANDARD', 'VIP', 'BALCONY'] as const)
+          await c.query(
+            'INSERT INTO session_prices(session_id,category,price_kopecks) VALUES ($1,$2,$3)',
+            [s.id, category, p.prices[category]],
+          );
+        await c.query(
+          'INSERT INTO session_seats(session_id,seat_id,hall_id,category) SELECT $1,id,hall_id,category FROM seats WHERE hall_id=$2',
+          [s.id, p.hallId],
+        );
+        return s;
+      });
+      res.status(update ? 200 : 201).json(row);
+    };
+  router.post('/admin/sessions', saveSession(false));
+  router.patch('/admin/sessions/:id', saveSession(true));
   return router;
 }
