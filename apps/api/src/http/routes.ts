@@ -232,5 +232,104 @@ export function apiRoutes(pool: DatabasePool): Router {
       if (result.observerFailures.length) console.error('Booking audit failed.');
       res.json(result.booking.snapshot);
     });
+  router.use('/admin', requireUser, requireAdmin);
+  router.get('/admin/productions', async (_req, res) =>
+    res.json((await pool.query('SELECT * FROM productions ORDER BY title')).rows),
+  );
+  router.post('/admin/productions', async (req, res) => {
+    const p = production.parse(req.body);
+    res
+      .status(201)
+      .json(
+        (
+          await pool.query(
+            'INSERT INTO productions(title,description,type,duration_minutes,archived) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+            [p.title, p.description, p.type, p.durationMinutes, p.archived],
+          )
+        ).rows[0],
+      );
+  });
+  router.patch('/admin/productions/:id', async (req, res) => {
+    const p = production.parse(req.body),
+      key = id.parse(req.params.id);
+    const row = await inTransaction(pool, async (c) => {
+      await lockInventory(c);
+      if (
+        p.archived &&
+        (
+          await c.query(
+            "SELECT 1 FROM bookings b JOIN sessions s ON s.id=b.session_id WHERE s.production_id=$1 AND s.starts_at>now() AND b.status IN ('PENDING','PAID') LIMIT 1",
+            [key],
+          )
+        ).rowCount
+      )
+        throw new HttpError(409, 'Є майбутні бронювання або продажі.');
+      return (
+        await c.query(
+          'UPDATE productions SET title=$1,description=$2,type=$3,duration_minutes=$4,archived=$5 WHERE id=$6 RETURNING *',
+          [p.title, p.description, p.type, p.durationMinutes, p.archived, key],
+        )
+      ).rows[0];
+    });
+    if (!row) throw new HttpError(404, 'Подію не знайдено.');
+    res.json(row);
+  });
+  router.get('/admin/halls', async (_req, res) =>
+    res.json(
+      (
+        await pool.query(
+          'SELECT h.*,count(s.id)::int AS capacity FROM halls h LEFT JOIN seats s ON s.hall_id=h.id GROUP BY h.id ORDER BY h.name',
+        )
+      ).rows,
+    ),
+  );
+  router.post('/admin/halls', async (req, res) => {
+    const p = z
+      .object({
+        name: text,
+        rows: z.number().int().min(1).max(20),
+        seatsPerRow: z.number().int().min(1).max(30),
+        vipRows: z.array(z.number().int().min(1).max(20)).default([]),
+        balconyRows: z.array(z.number().int().min(1).max(20)).default([]),
+      })
+      .parse(req.body);
+    if (
+      [...p.vipRows, ...p.balconyRows].some((r) => r > p.rows) ||
+      p.vipRows.some((r) => p.balconyRows.includes(r))
+    )
+      throw new HttpError(400, 'Перевірте категорії рядів.');
+    const hall = await inTransaction(pool, async (c) => {
+      const h = (await c.query('INSERT INTO halls(name) VALUES ($1) RETURNING *', [p.name]))
+        .rows[0];
+      for (let row = 1; row <= p.rows; row++)
+        for (let seat = 1; seat <= p.seatsPerRow; seat++)
+          await c.query(
+            'INSERT INTO seats(hall_id,row_number,seat_number,category) VALUES ($1,$2,$3,$4)',
+            [
+              h.id,
+              row,
+              seat,
+              p.vipRows.includes(row)
+                ? 'VIP'
+                : p.balconyRows.includes(row)
+                  ? 'BALCONY'
+                  : 'STANDARD',
+            ],
+          );
+      return h;
+    });
+    res.status(201).json(hall);
+  });
+  router.patch('/admin/halls/:id', async (req, res) => {
+    const p = z.object({ name: text }).parse(req.body);
+    const row = (
+      await pool.query('UPDATE halls SET name=$1 WHERE id=$2 RETURNING *', [
+        p.name,
+        id.parse(req.params.id),
+      ])
+    ).rows[0];
+    if (!row) throw new HttpError(404, 'Зал не знайдено.');
+    res.json(row);
+  });
   return router;
 }
