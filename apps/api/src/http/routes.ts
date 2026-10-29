@@ -393,5 +393,56 @@ export function apiRoutes(pool: DatabasePool): Router {
     };
   router.post('/admin/sessions', saveSession(false));
   router.patch('/admin/sessions/:id', saveSession(true));
+  router.get('/admin/discounts', async (_req, res) =>
+    res.json((await pool.query('SELECT * FROM discounts ORDER BY code')).rows),
+  );
+  const saveDiscount =
+    (update: boolean): RequestHandler =>
+    async (req, res) => {
+      const p = discount.parse(req.body);
+      if (new Date(p.validTo) <= new Date(p.validFrom))
+        throw new HttpError(400, 'Некоректний період знижки.');
+      const row = await inTransaction(pool, async (c) => {
+        await lockInventory(c);
+        return (
+          update
+            ? await c.query(
+                "UPDATE discounts SET code=$1,percent=$2,valid_from=$3,valid_to=$4,active=$5 WHERE id=$6 AND type='PROMO' RETURNING *",
+                [p.code, p.percent, p.validFrom, p.validTo, p.active, id.parse(req.params.id)],
+              )
+            : await c.query(
+                "INSERT INTO discounts(code,type,percent,valid_from,valid_to,active) VALUES ($1,'PROMO',$2,$3,$4,$5) RETURNING *",
+                [p.code, p.percent, p.validFrom, p.validTo, p.active],
+              )
+        ).rows[0];
+      });
+      if (!row) throw new HttpError(404, 'Знижку не знайдено.');
+      res.status(update ? 200 : 201).json(row);
+    };
+  router.post('/admin/discounts', saveDiscount(false));
+  router.patch('/admin/discounts/:id', saveDiscount(true));
+  router.get('/admin/users', async (_req, res) =>
+    res.json(
+      (
+        await pool.query(
+          'SELECT id,email,display_name,role,student_verified FROM users ORDER BY created_at DESC LIMIT 300',
+        )
+      ).rows,
+    ),
+  );
+  router.patch('/admin/users/:id', async (req, res) => {
+    const p = z.object({ studentVerified: z.boolean() }).parse(req.body);
+    const row = await inTransaction(pool, async (c) => {
+      await lockInventory(c);
+      return (
+        await c.query(
+          'UPDATE users SET student_verified=$1 WHERE id=$2 RETURNING id,student_verified',
+          [p.studentVerified, id.parse(req.params.id)],
+        )
+      ).rows[0];
+    });
+    if (!row) throw new HttpError(404, 'Користувача не знайдено.');
+    res.json(row);
+  });
   return router;
 }
