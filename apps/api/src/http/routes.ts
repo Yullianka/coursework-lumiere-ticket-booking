@@ -444,5 +444,27 @@ export function apiRoutes(pool: DatabasePool): Router {
     if (!row) throw new HttpError(404, 'Користувача не знайдено.');
     res.json(row);
   });
+  router.get('/admin/reports', async (req, res) => {
+    await expireBookings(pool);
+    const p = z.object({ from: date, to: date }).parse(req.query);
+    if (
+      new Date(p.to) <= new Date(p.from) ||
+      new Date(p.to).getTime() - new Date(p.from).getTime() > 366 * 86400000
+    )
+      throw new HttpError(400, 'Оберіть період до одного року.');
+    const sales = await pool.query(
+      `SELECT count(t.id)::int AS tickets,coalesce(sum(i.final_price_kopecks),0)::bigint AS revenue FROM tickets t JOIN booking_items i ON i.id=t.booking_item_id JOIN bookings b ON b.id=i.booking_id WHERE b.status='PAID' AND t.sold_at >= $1 AND t.sold_at < $2`,
+      [p.from, p.to],
+    );
+    const revenue = await pool.query(
+      `SELECT p.title,s.id AS session_id,s.starts_at,count(t.id)::int AS tickets,sum(i.final_price_kopecks)::bigint AS revenue FROM tickets t JOIN booking_items i ON i.id=t.booking_item_id JOIN bookings b ON b.id=i.booking_id JOIN sessions s ON s.id=b.session_id JOIN productions p ON p.id=s.production_id WHERE b.status='PAID' AND t.sold_at >= $1 AND t.sold_at < $2 GROUP BY p.title,s.id ORDER BY s.starts_at`,
+      [p.from, p.to],
+    );
+    const occupancy = await pool.query(
+      `SELECT to_char(s.starts_at AT TIME ZONE 'Europe/Kyiv','YYYY-MM-DD') AS day,h.name AS hall,count(*)::int AS capacity,count(*) FILTER(WHERE ss.status='SOLD')::int AS sold,count(*) FILTER(WHERE ss.status='RESERVED')::int AS reserved,round(100.0*count(*) FILTER(WHERE ss.status='SOLD')/nullif(count(*),0),1) AS percent FROM session_seats ss JOIN sessions s ON s.id=ss.session_id JOIN halls h ON h.id=s.hall_id WHERE s.starts_at >= $1 AND s.starts_at < $2 AND NOT s.archived GROUP BY day,h.name ORDER BY day,h.name`,
+      [p.from, p.to],
+    );
+    res.json({ summary: sales.rows[0], revenue: revenue.rows, occupancy: occupancy.rows });
+  });
   return router;
 }
