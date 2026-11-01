@@ -1,0 +1,26 @@
+{
+  "name": "lumiere-coursework",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "check": "npm run check --workspaces",
+    "build": "npm run build --workspaces",
+    "db:local": "node scripts/local-db.mjs",
+    "db:stop": "node scripts/local-db.mjs stop",
+    "test": "npm test -w apps/api",
+    "test:integration": "node scripts/test-integration.mjs",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,css}\" \"scripts/*.mjs\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.10.1"
+  }
+}
