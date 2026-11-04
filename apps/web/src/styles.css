@@ -624,3 +624,45 @@ small {
   background: #eaf0e7;
   color: #43653c;
 }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #101925b3;
+  backdrop-filter: blur(5px);
+  overflow-y: auto;
+  padding: 40px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.dialog {
+  background: #faf9f6;
+  padding: 36px;
+  border-radius: 10px;
+  position: relative;
+  box-shadow: 0 20px 100px #10192566;
+  max-width: 100%;
+  margin: auto;
+}
+.auth-dialog {
+  width: 440px;
+}
+.auth-dialog form {
+  margin-top: 25px;
+}
+.auth-dialog .primary {
+  width: 100%;
+  justify-content: center;
+}
+.close {
+  position: absolute;
+  right: 16px;
+  top: 10px;
+  font-size: 28px;
+  background: none;
+  color: #6c737d;
+}
+.dialog h2 {
+  padding-right: 20px;
+}
