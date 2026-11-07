@@ -1,0 +1,34 @@
+@startuml
+left to right direction
+actor "Guest" as Guest
+actor "Customer" as Client
+actor "Administrator" as Admin
+actor "Scheduler" as Timer
+Client --|> Guest
+rectangle "Ticket Booking System" {
+ usecase "Browse productions and sessions" as Browse
+ usecase "View seating plan" as Seats
+ usecase "Register / sign in" as Login
+ usecase "Reserve seats" as Book
+ usecase "Calculate price and discount" as Price
+ usecase "Confirm simulated payment" as Pay
+ usecase "Cancel booking" as Cancel
+ usecase "View personal tickets" as Own
+ usecase "Manage productions, halls and sessions" as Manage
+ usecase "Manage prices and discounts" as Discounts
+ usecase "View reports" as Reports
+ usecase "Expire unpaid bookings" as Expire
+}
+Guest --> Browse
+Guest --> Seats
+Guest --> Login
+Client --> Book
+Client --> Pay
+Client --> Cancel
+Client --> Own
+Book ..> Price : <<include>>
+Admin --> Manage
+Admin --> Discounts
+Admin --> Reports
+Timer --> Expire
+@enduml
