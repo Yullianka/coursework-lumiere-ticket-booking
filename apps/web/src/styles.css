@@ -889,3 +889,122 @@ small {
 .booking-actions p {
   margin-right: auto;
 }
+.admin-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 28px 0 36px;
+  border-bottom: 1px solid #dddbd1;
+  padding-bottom: 12px;
+}
+.admin-tabs button {
+  padding: 10px 20px;
+  background: transparent;
+  font-size: 12px;
+  border-radius: 4px;
+}
+.admin-tabs button[aria-pressed='true'] {
+  background: #202838;
+  color: white;
+}
+.table-scroll {
+  overflow-x: auto;
+  margin: 20px 0 35px;
+  background: #fff;
+  border: 1px solid #e2dfd7;
+  border-radius: 6px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  text-align: left;
+}
+th {
+  font-size: 10px;
+  color: #777c80;
+  background: #f0efe9;
+  font-weight: 600;
+  white-space: nowrap;
+}
+td,
+th {
+  padding: 15px 18px;
+  border-bottom: 1px solid #eae8e1;
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+td > strong {
+  font-size: 13px;
+}
+.editor-dialog {
+  width: 560px;
+}
+.editor-dialog form {
+  margin-top: 24px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.check {
+  flex-direction: row;
+  align-items: center;
+  font-weight: 400;
+}
+.check input {
+  width: auto;
+}
+.report-filter {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 24px 0 12px;
+}
+.metrics {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 30px 0;
+}
+.metrics article {
+  background: #eeede5;
+  padding: 22px 28px;
+  border-radius: 6px;
+  min-width: 220px;
+}
+.metrics span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #75766e;
+}
+.metrics strong {
+  display: block;
+  font-size: 34px;
+  font-weight: 500;
+  margin-top: 7px;
+}
+.metrics > button {
+  margin-left: auto;
+}
+.occupancy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+progress {
+  width: 90px;
+  height: 8px;
+  accent-color: #7d8c69;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
