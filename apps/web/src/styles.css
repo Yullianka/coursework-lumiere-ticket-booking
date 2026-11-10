@@ -1008,3 +1008,202 @@ progress {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
+@media (max-width: 900px) {
+  .header nav {
+    gap: 15px;
+  }
+  .account > span {
+    display: none;
+  }
+  .seat-layout {
+    grid-template-columns: 1fr;
+  }
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  .filter-bar .filters {
+    width: 100%;
+  }
+  .metrics {
+    flex-wrap: wrap;
+  }
+  .metrics > button {
+    margin-left: 0;
+  }
+  .event-body {
+    padding: 18px;
+  }
+  .card-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 600px) {
+  .header {
+    height: auto;
+    min-height: 85px;
+    flex-wrap: wrap;
+    padding-top: 16px;
+    padding-bottom: 12px;
+    gap: 12px;
+  }
+  .header nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    gap: 30px;
+  }
+  .account {
+    font-size: 11px;
+  }
+  .brand {
+    font-size: 26px;
+  }
+  .hero {
+    padding-top: 32px;
+  }
+  .hero h1 {
+    font-size: 43px;
+  }
+  .hero-note {
+    font-size: 9px;
+  }
+  .event-grid {
+    grid-template-columns: 1fr;
+  }
+  .filter-bar > label {
+    flex: 1;
+  }
+  .filter-bar .filters {
+    gap: 5px;
+  }
+  .filters button {
+    padding: 9px 16px;
+  }
+  .small-note {
+    display: block;
+  }
+  .section-heading {
+    flex-wrap: wrap;
+  }
+  .section-heading > .small-note {
+    font-size: 10px;
+  }
+  .overlay {
+    padding: 12px;
+  }
+  .dialog {
+    padding: 26px 20px;
+  }
+  .dialog h2 {
+    font-size: 22px;
+  }
+  .seat-layout {
+    gap: 20px;
+  }
+  .seat {
+    flex-basis: 28px;
+    width: 28px;
+    height: 30px;
+  }
+  .seat-row {
+    gap: 4px;
+  }
+  .workspace h1 {
+    font-size: 34px;
+  }
+  .booking-card {
+    padding: 20px 16px;
+  }
+  .booking-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0;
+  }
+  .booking-price {
+    font-size: 22px;
+  }
+  .booking-heading h2 {
+    font-size: 22px;
+  }
+  .booking-actions {
+    gap: 10px;
+  }
+  .booking-actions p {
+    width: 100%;
+    margin: 0;
+  }
+  .admin-tabs {
+    gap: 2px;
+  }
+  .admin-tabs button {
+    padding: 8px 12px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .metrics {
+    gap: 12px;
+  }
+  .metrics article {
+    min-width: 0;
+    flex: 1;
+    padding: 18px;
+  }
+  .metrics strong {
+    font-size: 25px;
+  }
+  .metrics > button {
+    width: 100%;
+  }
+  .footer {
+    flex-wrap: wrap;
+  }
+  .report-filter > label {
+    flex: 1;
+  }
+  .report-filter .primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .card-bottom {
+    flex-direction: row;
+    align-items: center;
+  }
+  .event-art {
+    height: 190px;
+  }
+}
+@media print {
+  .header,
+  .footer,
+  .booking-actions,
+  .workspace > .section-heading button,
+  .workspace > .eyebrow,
+  .text-button,
+  .skip,
+  .overlay,
+  .notice {
+    display: none !important;
+  }
+  .wrap {
+    width: 100%;
+  }
+  .workspace {
+    padding: 0;
+  }
+  .booking-card {
+    break-inside: avoid;
+  }
+  .booking-card:not(.paid) {
+    display: none;
+  }
+  .booking-card {
+    border: 1px solid #aaa;
+    box-shadow: none;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+}
