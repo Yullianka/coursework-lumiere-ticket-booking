@@ -1,6 +1,6 @@
 # Lumière API
 
-Express and TypeScript server package with domain pricing strategies.
+Express and TypeScript server package with booking domain patterns.
 
 ## Requirements and setup
 
@@ -41,8 +41,8 @@ Unknown routes return a JSON 404 error. Malformed JSON returns 400, and JSON
 request bodies above 32 KB return 413. Internal errors return a generic JSON 500
 response. SIGINT and SIGTERM stop the HTTP server gracefully.
 
-Booking lifecycle logic, authentication, database persistence and booking routes
-will be added in subsequent changes.
+The booking domain is implemented and exercised by tests. Authentication,
+PostgreSQL persistence and booking HTTP routes are not implemented yet.
 
 ## Files
 
@@ -63,3 +63,27 @@ New strategies can be injected into `PricingService` without changing its
 selection algorithm. The returned price breakdown is immutable.
 `test/pricing.test.ts` covers eligibility, rounding, promotion boundaries,
 validation, extension strategies, zero prices and full discounts.
+
+## Booking lifecycle and events
+
+- `src/domain/booking.ts`: immutable booking aggregate, validated seat selections
+  and fixed price snapshots.
+- `src/domain/booking-state.ts`: State pattern for PENDING, PAID, CANCELLED and
+  EXPIRED. Reservations expire after 15 minutes or at the session start.
+- `src/application/booking-events.ts`: Observer publisher and audit subscriber.
+- `src/application/booking-service.ts`: coordinates pricing, state transitions,
+  persistence and event delivery.
+- `test/patterns.test.ts`: lifecycle tests and combined Strategy/State/Observer
+  scenarios.
+
+`BookingService` requires a `BookingRepository`. A future PostgreSQL adapter must
+atomically reserve/release seat inventory, issue tickets on payment and reject
+stale updates. The test adapter checks stale updates but is not a production
+inventory repository. Prices and eligibility must come from trusted server data.
+
+A transition produces a new booking. Failed persistence leaves the original
+unchanged and emits no event. Events are published after successful persistence.
+Subscriber errors are returned in `observerFailures`; callers must inspect them.
+These errors do not turn a saved change into a failed operation. Delivery is
+in-process; durable delivery and an expiration scheduler are future integration
+work. Expiration currently runs through the explicit `expire` service method.
