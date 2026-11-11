@@ -6,3 +6,6 @@ dist/
 .DS_Store
 coverage/
 *.log
+
+# Local PostgreSQL data and generated development credentials
+.local/
