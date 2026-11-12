@@ -10,7 +10,7 @@ A booking temporarily holds seats for a customer. A paid booking produces ticket
 
 The interface is Ukrainian, the currency is UAH, and local session times use Europe/Kyiv. Database timestamps use `timestamptz`; monetary amounts are stored as integer kopecks.
 
-Payment is simulated for this coursework: confirmation records a sale without charging real money. Integration with a real payment provider and refunds of paid tickets are outside the initial scope. The requirements below describe the target system, not currently implemented features.
+Payment is simulated for this coursework: confirmation records a sale without charging real money. Integration with a real payment provider and refunds of paid tickets are outside the initial scope. The requirements below define the implemented coursework scope.
 
 ## Actors
 
@@ -47,7 +47,7 @@ Payment is simulated for this coursework: confirmation records a sale without ch
 5. Percentage discounts are rounded to the nearest kopeck per seat. The server determines prices and discount eligibility rather than trusting client-supplied values.
 6. SOLD indicates a paid ticket, RESERVED an active unpaid booking, and AVAILABLE a seat that can be booked.
 7. Customers can access only their own bookings. Administrative operations require server-side role checks.
-8. Historical sales are retained. Productions and sessions with history are archived rather than cascade-deleted.
+8. Historical sales are retained; there are no destructive deletion endpoints. Productions can be hidden when they have no active future sales or reservations. A session with booking history cannot be rescheduled.
 9. Reporting periods use half-open intervals `[from, to)` with timezone-aware boundaries. Revenue includes only PAID bookings. Occupancy is sold seats divided by available capacity, multiplied by 100%; temporary reservations are reported separately. Daily occupancy uses total sold seats divided by total seat capacity across that day's sessions.
 
 ## Non-functional requirements
@@ -56,7 +56,7 @@ Payment is simulated for this coursework: confirmation records a sale without ch
 - Update reservations and seat inventory atomically using database transactions.
 - Hash passwords, protect authentication cookies and keep secrets out of Git.
 - Provide a responsive interface with keyboard-accessible seat selection and text labels in addition to status colors.
-- Verify core workflows, authorization and concurrent booking using integration tests when those features are implemented.
+- Verify core workflows, authorization and concurrent booking using database-backed integration tests.
 
 ## Main use case: reserve seats
 

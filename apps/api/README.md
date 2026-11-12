@@ -1,112 +1,91 @@
-# Lumière API
+# Lumière REST API
 
-Express and TypeScript server package with booking domain patterns and PostgreSQL setup.
+Express 5 + TypeScript + PostgreSQL. Run from the repository root with
+`npm run dev -w apps/api`. Configuration is loaded from `apps/api/.env`.
+See the root README for full setup, administrator bootstrap and verification.
 
-## Requirements and setup
+## Contract
 
-Use Node.js 22.12+ and npm. From `apps/api`:
+All paths below start with `/api`. Request bodies are JSON, limited to 32 KB.
+Dates are ISO 8601 strings with timezone offsets; amounts are integer kopecks.
+Errors use `{ "error": { "code": "...", "message": "..." } }`.
+Validation errors include field details. Expected responses include 400 (validation),
+401 (sign-in required), 403 (not allowed), 404, 409 (conflict), 413, 415 and 429.
 
-```sh
-npm ci --workspaces=false
-npm run check
-npm test
-npm run build
-npm run dev
-```
+Authentication uses an HttpOnly, SameSite=Strict cookie. Cookies are Secure under
+`NODE_ENV=production`; production requires HTTPS and an explicit `APP_ORIGIN`.
+Local allowed origins include localhost/127.0.0.1 on ports 3001, 5173 and 4173.
+Mutations reject unapproved browser origins and non-JSON content types.
+Auth routes are rate-limited to 60 requests per 15 minutes per IP.
 
-`npm start` runs the compiled server after `npm run build`.
-The package can be installed independently of the frontend.
+| Method | Path | Access / behavior |
+|---|---|---|
+| GET | `/health` | Process liveness. |
+| GET | `/ready` | Database connectivity; 503 if unavailable. Does not check migration state. |
+| POST | `/auth/register` | `email`, `password` (8–128 chars), `displayName`; creates CLIENT and signs in. |
+| POST | `/auth/login` | `email`, `password`; sets session cookie. |
+| GET | `/auth/me` | `{user}` or `{user:null}`. |
+| POST | `/auth/logout` | `{}`; revokes session, clears cookie; 204. |
+| GET | `/productions` | Active productions. |
+| GET | `/sessions` | Upcoming active sessions with availability and minimum price. |
+| GET | `/sessions/:id/seats` | `{session,seats}` with row, number, category, price and status. |
+| POST | `/bookings` | Customer: `sessionId`, `seatIds` (1–8 unique IDs), optional `promoCode`. |
+| GET | `/bookings/mine` | Customer's bookings with prices, seat labels and ticket IDs. |
+| POST | `/bookings/:id/pay` | Owner only; `{}`; simulated payment, no external charge. |
+| POST | `/bookings/:id/cancel` | Owner only; `{}`; releases unpaid reservation. |
+| GET/POST | `/admin/productions` | Admin: list/create productions. |
+| PATCH | `/admin/productions/:id` | Admin: edit production or hide from catalog. |
+| GET/POST | `/admin/halls` | Admin: list/create hall and numbered seats. |
+| PATCH | `/admin/halls/:id` | Admin: rename hall; established seat maps remain fixed. |
+| GET/POST | `/admin/sessions` | Admin: list/create schedule and prices. |
+| PATCH | `/admin/sessions/:id` | Admin: edit only sessions without booking history. |
+| GET/POST | `/admin/discounts` | Admin: list/create promo codes. |
+| PATCH | `/admin/discounts/:id` | Admin: edit promo code. |
+| GET | `/admin/users` | Admin: account details without password/session hashes. |
+| PATCH | `/admin/users/:id` | Admin: `{studentVerified:boolean}`. |
+| GET | `/admin/reports?from=...&to=...` | Admin: sales summary, session revenue and hall/day occupancy. |
 
-## Configuration
+Catalog lists are limited to 200 records; the admin session/user lists to 300 and
+personal booking history to 200. This bounds the coursework UI; pagination is a
+future enhancement for larger catalogs.
 
-The server binds to `127.0.0.1` and uses port 3001 by default.
-Override it with an environment variable:
+## Administrative payloads
 
-```sh
-PORT=3002 npm run dev
-```
+Production: `{title, description, type: "FILM"|"PLAY", durationMinutes, archived?}`.
+Hall: `{name, rows, seatsPerRow, vipRows?:number[], balconyRows?:number[]}`.
+Rows are 1-based, at most 20 rows and 30 seats per row. Categories must not overlap.
+Rename: `{name}`.
 
-Copy `.env.example` to `.env` and set `DATABASE_URL` for a dedicated PostgreSQL
-database. Development, start and database commands load `.env` automatically
-from this package directory. Existing shell variables take precedence.
+Session: `{productionId, hallId, startsAt, prices:{STANDARD,VIP,BALCONY}, archived?}`.
+All three category prices are required. End time derives from production duration.
+Changing a production's duration affects newly saved sessions, not existing ones.
+The database rejects overlapping schedules. Sessions with history cannot be edited.
 
-## Current API
+Promotion: `{code, percent, validFrom, validTo, active?}`. Codes are 3–32 ASCII
+letters/digits/underscores/hyphens, normalized to uppercase. Admin edit forms submit
+all fields of the relevant record; omitted optional flags use their schema defaults.
+There are no hard-delete endpoints and no paid-ticket refund flow.
 
-`GET /api/health` returns HTTP 200:
+## Consistency
 
-```json
-{"status":"ok","service":"lumiere-api","stage":"database-foundation"}
-```
+A booking transitions PENDING → PAID / CANCELLED / EXPIRED. Repeating an already
+completed identical action is idempotent. Conflicting concurrent updates return
+409. Expiration is bounded by session start. Prices are immutable snapshots, so
+later promotion or eligibility edits never change an existing booking's amount.
 
-Unknown routes return a JSON 404 error. Malformed JSON returns 400, and JSON
-request bodies above 32 KB return 413. Internal errors return a generic JSON 500
-response. SIGINT and SIGTERM stop the HTTP server gracefully.
+Inventory, booking records and ticket issuance update in one transaction.
+Strategy, State and Observer cooperate through `BookingService`; PostgreSQL
+implements its repository contract. Events are delivered after commit to the
+booking audit observer. Subscriber failure is logged separately from the saved action.
 
-The booking domain is implemented and exercised by tests. Authentication,
-the PostgreSQL booking repository and booking HTTP routes are not implemented yet.
+Reports use half-open `[from,to)` periods, at most 366 days. Revenue uses payment
+dates and PAID bookings. Occupancy uses session dates grouped by Europe/Kyiv day,
+with sold and reserved counts separate. Occupancy = sold / total session capacity.
+The frontend can export the report to CSV and print issued tickets.
 
-## Files
+## Tests
 
-- `src/app.ts`: Express application, health endpoint and error handling.
-- `src/server.ts`: port validation, HTTP listener and shutdown handling.
-- `tsconfig.json`: strict TypeScript configuration.
-
-## Discount strategies
-
-`src/domain/pricing.ts` implements the Strategy pattern through the
-`DiscountStrategy` interface and `NoDiscount`, `StudentDiscount` and `PromoDiscount`.
-`PricingService` chooses the largest eligible discount without stacking discounts.
-Prices are integer kopecks; discounts are rounded per seat. Promotion validity
-uses an inclusive start and exclusive end. Student eligibility and promotion
-data must come from trusted server-side data when HTTP integration is added.
-
-New strategies can be injected into `PricingService` without changing its
-selection algorithm. The returned price breakdown is immutable.
-`test/pricing.test.ts` covers eligibility, rounding, promotion boundaries,
-validation, extension strategies, zero prices and full discounts.
-
-## Booking lifecycle and events
-
-- `src/domain/booking.ts`: immutable booking aggregate, validated seat selections
-  and fixed price snapshots.
-- `src/domain/booking-state.ts`: State pattern for PENDING, PAID, CANCELLED and
-  EXPIRED. Reservations expire after 15 minutes or at the session start.
-- `src/application/booking-events.ts`: Observer publisher and audit subscriber.
-- `src/application/booking-service.ts`: coordinates pricing, state transitions,
-  persistence and event delivery.
-- `test/patterns.test.ts`: lifecycle tests and combined Strategy/State/Observer
-  scenarios.
-
-`BookingService` requires a `BookingRepository`. A future PostgreSQL adapter must
-atomically reserve/release seat inventory, issue tickets on payment and reject
-stale updates. The test adapter checks stale updates but is not a production
-inventory repository. Prices and eligibility must come from trusted server data.
-
-A transition produces a new booking. Failed persistence leaves the original
-unchanged and emits no event. Events are published after successful persistence.
-Subscriber errors are returned in `observerFailures`; callers must inspect them.
-These errors do not turn a saved change into a failed operation. Delivery is
-in-process; durable delivery and an expiration scheduler are future integration
-work. Expiration currently runs through the explicit `expire` service method.
-
-## PostgreSQL
-
-See [database setup](../../database/README.md) for server/account setup, migration
-behavior, seed contents and dedicated database tests. Keep the repository layout
-when running database commands: SQL files live in the root `database` directory.
-
-```sh
-npm run db:check
-npm run db:migrate
-npm run db:seed
-npm run test:db
-```
-
-`test:db` requires `TEST_DATABASE_URL` pointing to a fresh empty disposable
-database ending in `_test`. Regular `npm test` does not require PostgreSQL.
-
-`GET /api/health` reports process liveness. `GET /api/ready` executes `SELECT 1`
-against PostgreSQL and returns 200 when connected, or 503 when the connection
-is unavailable or unconfigured. It checks connectivity, not migration status.
-The API can start without a database; readiness will report not configured.
-Migrations and demo seeds never run automatically on server startup.
+`npm test` in this package runs the domain and readiness suite without a database.
+`npm run test:db` and `npm run test:http` each require a separate fresh empty
+`TEST_DATABASE_URL` ending in `_test`. The root `npm run test:integration` provisions
+and cleans up those disposable databases automatically.

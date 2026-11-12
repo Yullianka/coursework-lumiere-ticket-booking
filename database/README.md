@@ -3,6 +3,9 @@
 Requires PostgreSQL 14+ with the `btree_gist` extension available and Node.js 22.12+.
 The initial schema has been tested on PostgreSQL 14.18.
 
+For the bundled macOS/Linux helper, run `npm run db:local` from the root.
+For a separately managed PostgreSQL instance, use the steps below.
+
 ## Create a development database
 
 Start your local PostgreSQL server. Using a PostgreSQL administrator account, run:
@@ -55,7 +58,7 @@ Stable identifiers make repeat runs safe. Existing rows, edits, times and
 reservations are preserved. Existing sessions are not moved forward on later
 seed runs. No user accounts, passwords or sales are seeded.
 
-## Integrity and remaining integration
+## Integrity and booking integration
 
 Foreign keys tie session seats to the correct hall, category, session and booking.
 Unique constraints prevent duplicate seat numbers and tickets for one booking
@@ -63,9 +66,14 @@ item. Checks reject invalid amounts and inconsistent price breakdowns. An
 exclusion constraint prevents overlapping sessions in one hall; adjacent
 half-open intervals are allowed. Historical records have no cascading deletes.
 
-Booking status changes, inventory allocation/release and ticket issuance still
-need a transactional PostgreSQL implementation of `BookingRepository`. This PR
-does not claim to implement online bookings or concurrent seat reservations.
+`PostgresBookingRepository` commits booking state, inventory and ticket issuance
+atomically. A common transaction advisory lock serializes venue writes; stale
+status changes and occupied seats are rejected. The expiration worker and booking
+endpoints release expired reservations through the same domain/service flow.
+
+`002_auth_and_audit.sql` adds hashed server-side authentication sessions, an
+immutable discount label on booking items, and the booking event audit table.
+The audit observer writes after the booking transaction has committed.
 
 ## Database integration tests
 
