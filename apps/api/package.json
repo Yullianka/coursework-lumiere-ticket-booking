@@ -14,7 +14,8 @@
     "db:check": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts check",
     "test:db": "node --env-file-if-exists=.env --import tsx --test test/database/*.test.ts",
     "admin:create": "node --env-file-if-exists=.env --import tsx src/scripts/create-admin.ts",
-    "test:http": "node --env-file-if-exists=.env --import tsx --test test/http/*.test.ts"
+    "test:http": "node --env-file-if-exists=.env --import tsx --test test/http/*.test.ts",
+    "db:demo": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts demo"
   },
   "dependencies": {
     "express": "^5.1.0",
