@@ -41,6 +41,11 @@ and optionally `ADMIN_NAME` in the shell or untracked `apps/api/.env`. Existing
 users are never overwritten or silently promoted. Remove the bootstrap password
 from your shell/environment after use. There are no committed default passwords.
 
+For a populated demonstration with more events, halls, promo codes and fictional
+sales for reports, run `npm run db:demo -w apps/api`. See the
+[extended dataset description](database/README.md#extended-demonstration-dataset).
+This is optional and preserves existing bookings and accounts.
+
 ## Features
 
 - Film/play catalog with title, description, duration, hall and session time;
