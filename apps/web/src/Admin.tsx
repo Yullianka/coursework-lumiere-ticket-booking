@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Modal } from './Modal';
 import { api, money, when, type User } from './api';
 type Entity = 'productions' | 'halls' | 'sessions' | 'discounts';
@@ -61,23 +61,42 @@ export function Admin() {
     [notice, setNotice] = useState(''),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState(false);
+  const requestVersion = useRef(0);
+  function changeTab(next: typeof tab) {
+    if (next === tab) return;
+    requestVersion.current += 1;
+    setRows([]);
+    setUsers([]);
+    setEdit(undefined);
+    setLoading(true);
+    setTab(next);
+  }
   async function refresh() {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
-      if (tab === 'users') setUsers(await api<User[]>('/admin/users'));
-      else if (tab !== 'reports') setRows(await api<Row[]>('/admin/' + tab));
+      if (tab === 'users') {
+        const result = await api<User[]>('/admin/users');
+        if (version !== requestVersion.current) return;
+        setUsers(result);
+      } else if (tab !== 'reports') {
+        const result = await api<Row[]>('/admin/' + tab);
+        if (version !== requestVersion.current) return;
+        setRows(result);
+      }
       if (tab === 'sessions') {
         const [p, h] = await Promise.all([
           api<Row[]>('/admin/productions'),
           api<Row[]>('/admin/halls'),
         ]);
+        if (version !== requestVersion.current) return;
         setProductions(p);
         setHalls(h);
       }
     } catch (e) {
-      setError((e as Error).message);
+      if (version === requestVersion.current) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }
   useEffect(() => {
@@ -154,14 +173,14 @@ export function Admin() {
       <p className="muted">Події, розклад і результати вашого простору.</p>
       <nav className="admin-tabs" aria-label="Керування">
         {Object.entries(labels).map(([key, label]) => (
-          <button aria-pressed={tab === key} key={key} onClick={() => setTab(key as Entity)}>
+          <button aria-pressed={tab === key} key={key} onClick={() => changeTab(key as Entity)}>
             {label}
           </button>
         ))}
-        <button aria-pressed={tab === 'users'} onClick={() => setTab('users')}>
+        <button aria-pressed={tab === 'users'} onClick={() => changeTab('users')}>
           Клієнти
         </button>
-        <button aria-pressed={tab === 'reports'} onClick={() => setTab('reports')}>
+        <button aria-pressed={tab === 'reports'} onClick={() => changeTab('reports')}>
           Звіти
         </button>
       </nav>
