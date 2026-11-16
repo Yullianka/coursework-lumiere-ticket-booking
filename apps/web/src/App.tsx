@@ -31,7 +31,10 @@ export function App() {
     [version, setVersion] = useState(0);
   useEffect(() => {
     api<{ user: User | null }>('/auth/me')
-      .then((r) => setUser(r.user))
+      .then((r) => {
+        setUser(r.user);
+        if (r.user?.role === 'ADMIN') setPage('admin');
+      })
       .catch((e) => setError(e.message));
   }, []);
   useEffect(() => {
@@ -67,14 +70,20 @@ export function App() {
         Перейти до вмісту
       </a>
       <header className="header wrap">
-        <a href="#afisha" className="brand" onClick={() => setPage('afisha')}>
+        <a
+          href={user?.role === 'ADMIN' ? '#admin' : '#afisha'}
+          className="brand"
+          onClick={() => setPage(user?.role === 'ADMIN' ? 'admin' : 'afisha')}
+        >
           <span className="brand-icon">L</span>lumière<span className="brand-dot">.</span>
         </a>
         <nav aria-label="Основна навігація">
-          <button className={page === 'afisha' ? 'active' : ''} onClick={() => setPage('afisha')}>
-            Афіша
-          </button>
-          {user && (
+          {user?.role !== 'ADMIN' && (
+            <button className={page === 'afisha' ? 'active' : ''} onClick={() => setPage('afisha')}>
+              Афіша
+            </button>
+          )}
+          {user?.role === 'CLIENT' && (
             <button
               className={page === 'bookings' ? 'active' : ''}
               onClick={() => setPage('bookings')}
@@ -97,6 +106,7 @@ export function App() {
                   try {
                     await api('/auth/logout', 'POST', {});
                     setUser(null);
+                    setSelected(null);
                     setPage('afisha');
                   } catch (e) {
                     setError((e as Error).message);
@@ -119,7 +129,7 @@ export function App() {
             {error} <button onClick={() => setVersion((v) => v + 1)}>Повторити</button>
           </div>
         )}
-        {page === 'afisha' && (
+        {page === 'afisha' && user?.role !== 'ADMIN' && (
           <>
             <section className="hero wrap">
               <div className="hero-copy">
@@ -282,7 +292,9 @@ export function App() {
             </section>
           </>
         )}
-        {page === 'bookings' && user && <Bookings onBrowse={() => setPage('afisha')} />}
+        {page === 'bookings' && user?.role === 'CLIENT' && (
+          <Bookings onBrowse={() => setPage('afisha')} />
+        )}
         {page === 'admin' && user?.role === 'ADMIN' && <Admin />}
       </main>
       <footer className="footer wrap">
@@ -302,11 +314,13 @@ export function App() {
           done={async () => {
             const r = await api<{ user: User }>('/auth/me');
             setUser(r.user);
+            setPage(r.user.role === 'ADMIN' ? 'admin' : 'afisha');
+            if (r.user.role === 'ADMIN') setSelected(null);
             setAuth(false);
           }}
         />
       )}
-      {selected && !auth && (
+      {selected && !auth && user?.role !== 'ADMIN' && (
         <SeatPicker
           session={selected}
           user={user}

@@ -95,6 +95,14 @@ export function apiRoutes(pool: DatabasePool): Router {
     if (account(res)?.role !== 'ADMIN') throw new HttpError(403, 'Потрібні права адміністратора.');
     next();
   };
+  const requireClient: RequestHandler = (_req, res, next) => {
+    if (account(res)?.role !== 'CLIENT')
+      throw new HttpError(
+        403,
+        'Бронювання та квитки доступні лише клієнтам. Увійдіть у клієнтський акаунт.',
+      );
+    next();
+  };
   router.use(
     '/auth',
     rateLimit({
@@ -169,7 +177,7 @@ export function apiRoutes(pool: DatabasePool): Router {
     );
     res.json({ session, seats: seats.rows });
   });
-  router.post('/bookings', requireUser, async (req, res) => {
+  router.post('/bookings', requireUser, requireClient, async (req, res) => {
     const input = z
       .object({
         sessionId: id,
@@ -205,7 +213,7 @@ export function apiRoutes(pool: DatabasePool): Router {
     if (result.observerFailures.length) console.error('Booking audit failed.');
     res.status(201).json(result.booking.snapshot);
   });
-  router.get('/bookings/mine', requireUser, async (_req, res) => {
+  router.get('/bookings/mine', requireUser, requireClient, async (_req, res) => {
     await expireBookings(pool);
     res.json(
       (
@@ -222,7 +230,7 @@ export function apiRoutes(pool: DatabasePool): Router {
     );
   });
   for (const action of ['pay', 'cancel'] as const)
-    router.post(`/bookings/:id/${action}`, requireUser, async (req, res) => {
+    router.post(`/bookings/:id/${action}`, requireUser, requireClient, async (req, res) => {
       await expireBookings(pool);
       const { service, repository } = bookingServices(pool);
       const booking = await repository.load(id.parse(req.params.id));

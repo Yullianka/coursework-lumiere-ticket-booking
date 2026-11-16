@@ -43,9 +43,14 @@ test('HTTP workflows with PostgreSQL', async (t) => {
     });
     assert.equal(a.status, 201);
     assert.equal(b.status, 201);
-    await pool.query("UPDATE users SET role='ADMIN',student_verified=true WHERE id=$1", [
-      a.data.id,
-    ]);
+    const admin = await request('/auth/register', 'POST', {
+      email: 'admin@example.test',
+      password: 'admin-password-789',
+      displayName: 'Administrator',
+    });
+    assert.equal(admin.status, 201);
+    await pool.query("UPDATE users SET role='ADMIN' WHERE id=$1", [admin.data.id]);
+    await pool.query('UPDATE users SET student_verified=true WHERE id=$1', [a.data.id]);
     await t.test('auth, ownership, role and origin restrictions', async () => {
       assert.equal(
         (
@@ -67,6 +72,14 @@ test('HTTP workflows with PostgreSQL', async (t) => {
       );
       assert.equal((await request('/admin/users')).status, 401);
       assert.equal((await request('/admin/users', 'GET', undefined, b.cookie)).status, 403);
+      assert.equal((await request('/admin/users', 'GET', undefined, admin.cookie)).status, 200);
+      assert.equal((await request('/bookings/mine', 'GET', undefined, admin.cookie)).status, 403);
+      assert.equal((await request('/bookings', 'POST', {}, admin.cookie)).status, 403);
+      for (const action of ['pay', 'cancel'])
+        assert.equal(
+          (await request(`/bookings/${a.data.id}/${action}`, 'POST', {}, admin.cookie)).status,
+          403,
+        );
       const attack = await fetch(base + '/auth/logout', {
         method: 'POST',
         headers: {
@@ -120,7 +133,7 @@ test('HTTP workflows with PostgreSQL', async (t) => {
           validFrom: new Date(now - 60000).toISOString(),
           validTo: new Date(now + 86400000).toISOString(),
         },
-        a.cookie,
+        admin.cookie,
       );
       assert.equal(promo.status, 201);
       const booking = await reserve(a.cookie, seats[1].id, 'OPEN20');
@@ -154,7 +167,7 @@ test('HTTP workflows with PostgreSQL', async (t) => {
         `/admin/reports?from=${new Date(now - 86400000).toISOString()}&to=${new Date(now + 14 * 86400000).toISOString()}`,
         'GET',
         undefined,
-        a.cookie,
+        admin.cookie,
       );
       assert.equal(report.status, 200);
       assert.equal(report.data.summary.tickets, 1);
@@ -182,14 +195,14 @@ test('HTTP workflows with PostgreSQL', async (t) => {
         '/admin/halls',
         'POST',
         { name: 'Studio', rows: 3, seatsPerRow: 4, vipRows: [1], balconyRows: [3] },
-        a.cookie,
+        admin.cookie,
       );
       assert.equal(hall.status, 201);
       const prod = await request(
         '/admin/productions',
         'POST',
         { title: 'Test play', description: 'A production', type: 'PLAY', durationMinutes: 90 },
-        a.cookie,
+        admin.cookie,
       );
       assert.equal(prod.status, 201);
       const payload = {
@@ -198,15 +211,15 @@ test('HTTP workflows with PostgreSQL', async (t) => {
         startsAt: new Date(Date.now() + 10 * 86400000).toISOString(),
         prices: { STANDARD: 10000, VIP: 20000, BALCONY: 8000 },
       };
-      const created = await request('/admin/sessions', 'POST', payload, a.cookie);
+      const created = await request('/admin/sessions', 'POST', payload, admin.cookie);
       assert.equal(created.status, 201);
-      assert.equal((await request('/admin/sessions', 'POST', payload, a.cookie)).status, 409);
-      const halls = (await request('/admin/halls', 'GET', undefined, a.cookie)).data;
+      assert.equal((await request('/admin/sessions', 'POST', payload, admin.cookie)).status, 409);
+      const halls = (await request('/admin/halls', 'GET', undefined, admin.cookie)).data;
       const edited = await request(
         `/admin/sessions/${created.data.id}`,
         'PATCH',
         { ...payload, hallId: halls.find((h: { id: string }) => h.id !== hall.data.id).id },
-        a.cookie,
+        admin.cookie,
       );
       assert.equal(edited.status, 200);
       assert.equal((await request(`/sessions/${created.data.id}/seats`)).data.seats.length, 48);
