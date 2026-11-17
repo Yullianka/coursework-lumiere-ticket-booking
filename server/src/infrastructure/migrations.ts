@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { inTransaction, type DatabasePool } from './database.js';
 
-export const databaseDirectory = new URL('../../../../database/', import.meta.url);
+export const databaseDirectory = new URL('../../database/', import.meta.url);
 const LOCK_ID = 1171101;
 
 export async function migrate(

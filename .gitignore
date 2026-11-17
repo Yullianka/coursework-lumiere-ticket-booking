@@ -9,3 +9,6 @@ coverage/
 
 # Local PostgreSQL data and generated development credentials
 .local/
+
+.vite/
+.vite-temp/

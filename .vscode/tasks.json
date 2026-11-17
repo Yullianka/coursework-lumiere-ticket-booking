@@ -1,8 +1,92 @@
 {
- "version": "2.0.0",
- "tasks": [
-  {"label":"Lumière: запустити", "type":"shell", "command":"npm run dev", "problemMatcher":[], "isBackground":true},
-  {"label":"Lumière: перевірити типи", "type":"shell", "command":"npm run check", "problemMatcher":"$tsc"},
-  {"label":"Lumière: зібрати", "type":"shell", "command":"npm run build", "problemMatcher":[], "group":{"kind":"build","isDefault":true}}
- ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Lumière: запустити сервер",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/server"
+      },
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "Lumière: перевірити типи сервер",
+      "type": "shell",
+      "command": "npm run check",
+      "options": {
+        "cwd": "${workspaceFolder}/server"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Lumière: зібрати сервер",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/server"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lumière: запустити клієнт",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/client"
+      },
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "Lumière: перевірити типи клієнт",
+      "type": "shell",
+      "command": "npm run check",
+      "options": {
+        "cwd": "${workspaceFolder}/client"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Lumière: зібрати клієнт",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/client"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lumière: запустити",
+      "dependsOn": [
+        "Lumière: запустити сервер",
+        "Lumière: запустити клієнт"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lumière: перевірити типи",
+      "dependsOn": [
+        "Lumière: перевірити типи сервер",
+        "Lumière: перевірити типи клієнт"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lumière: зібрати",
+      "dependsOn": [
+        "Lumière: зібрати сервер",
+        "Lumière: зібрати клієнт"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
 }
