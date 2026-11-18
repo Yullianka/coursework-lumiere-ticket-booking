@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createDatabasePool, inTransaction } from '../../src/infrastructure/database.js';
 import { migrate, seed, databaseDirectory } from '../../src/infrastructure/migrations.js';
+import { seedDemoData } from '../../src/infrastructure/demo-data.js';
 import { createApp } from '../../src/app.js';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -204,6 +205,50 @@ test('PostgreSQL migrations, seed and constraints', async (t) => {
         server.closeAllConnections();
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }
+    });
+    await t.test('extended fixtures are repeatable and preserve existing sales', async () => {
+      const existing = (await pool.query('SELECT * FROM bookings ORDER BY id')).rows;
+      await seedDemoData(pool);
+      const counts = async () => {
+        const result: Record<string, number> = {};
+        for (const table of [
+          'halls',
+          'seats',
+          'productions',
+          'sessions',
+          'users',
+          'bookings',
+          'booking_items',
+          'tickets',
+          'booking_audit',
+        ]) {
+          result[table] = Number((await pool.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
+        }
+        return result;
+      };
+      const first = await counts();
+      assert.equal(first.halls, 3);
+      assert.equal(first.seats, 148);
+      assert.equal(first.productions, 10);
+      assert.equal(first.sessions, 38);
+      assert.equal(first.bookings, existing.length + 24);
+      assert.equal(first.tickets, 57);
+      assert.equal(first.booking_audit, 48);
+      assert.equal(
+        (
+          await pool.query(
+            "SELECT 1 FROM session_seats ss JOIN bookings b ON b.id=ss.booking_id WHERE ss.status='SOLD' AND b.status<>'PAID'",
+          )
+        ).rowCount,
+        0,
+      );
+      await seedDemoData(pool);
+      assert.deepEqual(await counts(), first);
+      for (const row of existing)
+        assert.deepEqual(
+          (await pool.query('SELECT * FROM bookings WHERE id=$1', [row.id])).rows[0],
+          row,
+        );
     });
   } finally {
     await pool.end();

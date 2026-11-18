@@ -90,3 +90,26 @@ The tests refuse a nonempty public schema and never erase data. Each new run
 needs a new empty test database (for example `lumiere_second_test`). Tests cover
 migration locking/idempotency, seed preservation, constraints, transaction/DDL
 rollback, migration checksums and HTTP readiness against PostgreSQL.
+
+## Extended demonstration dataset
+
+Run `npm run db:demo -w apps/api` explicitly to add a richer fictional dataset.
+It includes the basic catalog plus eight Ukrainian-language productions, two halls
+(60 and 40 seats), 36 sessions spanning six past and twelve current/upcoming days,
+three promo codes, six clearly labeled demo customers and 24 completed bookings.
+Sixteen paid bookings issue 56 tickets; four cancelled and four expired bookings
+leave their seats available. Category prices and discounts vary across sessions.
+
+On a fresh database this gives 10 productions, 3 halls, 148 physical seats and
+38 sessions. Existing data is preserved; repeated runs do not duplicate fixtures
+or move their dates. Demo clients have disabled login hashes and no default
+passwords. Use your normal account to demonstrate interactive booking.
+
+`LUMIERE15` and `THEATRE20` are active for 90 days from first insertion;
+`ARCHIVE10` is inactive. All fixture sales are synthetic, not actual transactions.
+The generated reports include them. For the first demonstration, choose a report
+period from seven days ago through twelve days ahead.
+
+The operation uses the inventory lock, preserves occupied seats and existing
+bookings, and rolls back the extended dataset on an error. The minimal `db:seed`
+command remains available for a small catalog without synthetic sales.
