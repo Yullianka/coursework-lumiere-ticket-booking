@@ -1,9 +1,10 @@
 import { createDatabasePool } from '../infrastructure/database.js';
+import { seedDemoData } from '../infrastructure/demo-data.js';
 import { migrate, seed } from '../infrastructure/migrations.js';
 
 const command = process.argv[2];
-if (!['migrate', 'seed', 'check'].includes(command ?? ''))
-  throw new Error('Usage: database.ts migrate|seed|check');
+if (!['migrate', 'seed', 'demo', 'check'].includes(command ?? ''))
+  throw new Error('Usage: database.ts migrate|seed|demo|check');
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.');
 const pool = createDatabasePool(process.env.DATABASE_URL);
 try {
@@ -13,6 +14,9 @@ try {
   } else if (command === 'seed') {
     await seed(pool);
     console.log('Demo catalog is ready. Existing records were preserved.');
+  } else if (command === 'demo') {
+    await seedDemoData(pool);
+    console.log('Extended fictional demo data is ready. Existing records were preserved.');
   } else {
     await pool.query('SELECT 1');
     console.log('PostgreSQL connection is ready.');
