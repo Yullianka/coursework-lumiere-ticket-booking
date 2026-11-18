@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import {
-  PaidState,
   CancelledState,
   ExpiredState,
+  PaidState,
   PendingState,
   type BookingState,
   type BookingStatus,
-} from './booking-state.js';
-import type { Price } from './pricing.js';
+} from '../patterns/booking-state.js';
+import type { Price } from '../patterns/pricing.js';
 
 export interface BookingItem extends Price {
   readonly seatId: string;
@@ -23,7 +23,6 @@ export interface BookingSnapshot {
   readonly totalKopecks: number;
 }
 
-/** Immutable aggregate: a transition produces a new booking; the original remains unchanged. */
 export class Booking {
   private constructor(
     private readonly data: Omit<BookingSnapshot, 'status'>,

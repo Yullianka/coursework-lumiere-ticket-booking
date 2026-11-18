@@ -1,5 +1,9 @@
-import { randomBytes, scrypt as derive, timingSafeEqual, createHash } from 'node:crypto';
-import type { DatabasePool } from './database.js';
+import { and, eq, gt } from 'drizzle-orm';
+import { createHash, scrypt as derive, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { Account } from '../types/services.js';
+import type { DatabasePool } from '../config/database.js';
+import { orm } from '../config/orm.js';
+import { auth_sessions, users } from '../models/schema.js';
 const scrypt = (password: string, salt: string): Promise<Buffer> =>
   new Promise((resolve, reject) =>
     derive(password, salt, 64, (error, key) => (error ? reject(error) : resolve(key))),
@@ -21,10 +25,13 @@ export async function verifyPassword(password: string, stored: string): Promise<
 export const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
 export async function issueSession(pool: DatabasePool, userId: string): Promise<string> {
   const token = randomBytes(32).toString('hex');
-  await pool.query(
-    "INSERT INTO auth_sessions(token_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '7 days')",
-    [tokenHash(token), userId],
-  );
+  await orm(pool)
+    .insert(auth_sessions)
+    .values({
+      token_hash: tokenHash(token),
+      user_id: userId,
+      expires_at: new Date(Date.now() + 7 * 24 * 3600000),
+    });
   return token;
 }
 export const readToken = (cookie?: string) =>
@@ -33,13 +40,8 @@ export const readToken = (cookie?: string) =>
     .map((p) => p.trim())
     .find((p) => p.startsWith('lumiere_session='))
     ?.slice(16);
-export interface Account {
-  id: string;
-  email: string;
-  display_name: string;
-  role: 'CLIENT' | 'ADMIN';
-  student_verified: boolean;
-}
+export type { Account } from '../types/services.js';
+
 export async function authenticate(
   pool: DatabasePool,
   cookie?: string,
@@ -47,9 +49,21 @@ export async function authenticate(
   const token = readToken(cookie);
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return undefined;
   return (
-    await pool.query<Account>(
-      `SELECT u.id,u.email,u.display_name,u.role,u.student_verified FROM users u JOIN auth_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>now()`,
-      [tokenHash(token)],
-    )
-  ).rows[0];
+    await orm(pool)
+      .select({
+        id: users.id,
+        email: users.email,
+        display_name: users.display_name,
+        role: users.role,
+        student_verified: users.student_verified,
+      })
+      .from(users)
+      .innerJoin(auth_sessions, eq(auth_sessions.user_id, users.id))
+      .where(
+        and(
+          eq(auth_sessions.token_hash, tokenHash(token)),
+          gt(auth_sessions.expires_at, new Date()),
+        ),
+      )
+  )[0];
 }

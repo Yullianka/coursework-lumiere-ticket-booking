@@ -1,9 +1,10 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
-import { HttpError } from './http/errors.js';
-import { InvalidTransitionError } from './domain/booking-state.js';
-import { apiRoutes } from './http/routes.js';
-import type { DatabasePool } from './infrastructure/database.js';
+import { createServices } from './composition.js';
+import { InvalidTransitionError } from './patterns/booking-state.js';
+import { HttpError } from './middleware/errors.js';
+import { apiRoutes } from './routes/index.js';
+import type { DatabasePool } from './config/database.js';
 
 export function createApp(databaseReady?: () => Promise<void>, pool?: DatabasePool) {
   const app = express();
@@ -27,7 +28,7 @@ export function createApp(databaseReady?: () => Promise<void>, pool?: DatabasePo
     }
   });
 
-  if (pool) app.use('/api', apiRoutes(pool));
+  if (pool) app.use('/api', apiRoutes(createServices(pool)));
 
   app.use((_request, response) => {
     response.status(404).json({ error: { code: 'NOT_FOUND', message: 'Маршрут не знайдено.' } });
@@ -45,15 +46,13 @@ export function createApp(databaseReady?: () => Promise<void>, pool?: DatabasePo
       return;
     }
     if (error instanceof ZodError) {
-      response
-        .status(400)
-        .json({
-          error: {
-            code: 'VALIDATION',
-            message: 'Перевірте заповнення полів.',
-            details: error.issues.map((i) => ({ path: i.path, message: i.message })),
-          },
-        });
+      response.status(400).json({
+        error: {
+          code: 'VALIDATION',
+          message: 'Перевірте заповнення полів.',
+          details: error.issues.map((i) => ({ path: i.path, message: i.message })),
+        },
+      });
       return;
     }
     if (error instanceof HttpError) {
@@ -63,28 +62,26 @@ export function createApp(databaseReady?: () => Promise<void>, pool?: DatabasePo
       return;
     }
     if (error instanceof InvalidTransitionError) {
-      response
-        .status(409)
-        .json({
-          error: {
-            code: 'INVALID_STATE',
-            message: 'Ця дія недоступна для поточного стану бронювання.',
-          },
-        });
+      response.status(409).json({
+        error: {
+          code: 'INVALID_STATE',
+          message: 'Ця дія недоступна для поточного стану бронювання.',
+        },
+      });
       return;
     }
-    if (['23505', '23P01', '23503', '23514'].includes(error?.code)) {
-      response
-        .status(409)
-        .json({
-          error: {
-            code: 'CONFLICT',
-            message:
-              error.code === '23P01'
-                ? 'У цьому залі вже є сеанс у вибраний час.'
-                : 'Дані конфліктують з наявними записами. Перевірте значення.',
-          },
-        });
+    // Drizzle wraps the original PostgreSQL error in `cause`.
+    const databaseCode = error?.cause?.code ?? error?.code;
+    if (['23505', '23P01', '23503', '23514'].includes(databaseCode)) {
+      response.status(409).json({
+        error: {
+          code: 'CONFLICT',
+          message:
+            databaseCode === '23P01'
+              ? 'У цьому залі вже є сеанс у вибраний час.'
+              : 'Дані конфліктують з наявними записами. Перевірте значення.',
+        },
+      });
       return;
     }
     console.error('Request failed:', error instanceof Error ? error.message : 'Unknown error');

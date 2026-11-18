@@ -1,6 +1,6 @@
-import { createDatabasePool } from '../infrastructure/database.js';
-import { seedDemoData } from '../infrastructure/demo-data.js';
-import { migrate, seed } from '../infrastructure/migrations.js';
+import { createDatabasePool } from '../config/database.js';
+import { seedDemoData } from './demo-data.js';
+import { migrate, seed } from '../config/migrations.js';
 
 const command = process.argv[2];
 if (!['migrate', 'seed', 'demo', 'check'].includes(command ?? ''))

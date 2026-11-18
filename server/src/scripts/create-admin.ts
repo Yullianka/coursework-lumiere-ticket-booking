@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createDatabasePool } from '../infrastructure/database.js';
-import { hashPassword } from '../infrastructure/auth.js';
+import { hashPassword } from '../repositories/session-repository.js';
+import { createDatabasePool } from '../config/database.js';
 const input = z
   .object({
     DATABASE_URL: z.string().min(1),

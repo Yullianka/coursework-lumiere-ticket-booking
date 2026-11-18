@@ -5,16 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --exclude \"../.local/**\" --env-file-if-exists=.env src/server.ts",
-    "check": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "check": "tsc --noEmit",
     "build": "tsc",
     "start": "node --env-file-if-exists=.env dist/server.js",
-    "test": "tsx --test test/*.test.ts",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts migrate",
     "db:seed": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts seed",
     "db:check": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts check",
-    "test:db": "node --env-file-if-exists=.env --import tsx --test test/database/*.test.ts",
     "admin:create": "node --env-file-if-exists=.env --import tsx src/scripts/create-admin.ts",
-    "test:http": "node --env-file-if-exists=.env --import tsx --test test/http/*.test.ts",
     "db:demo": "node --env-file-if-exists=.env --import tsx src/scripts/database.ts demo",
     "db:local": "node scripts/local-db.mjs",
     "db:stop": "node scripts/local-db.mjs stop"

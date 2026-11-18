@@ -1,6 +1,6 @@
-import { expireBookings } from './infrastructure/booking-repository.js';
 import { createApp } from './app.js';
-import { createDatabasePool } from './infrastructure/database.js';
+import { expireBookings } from './services/booking-expiration.js';
+import { createDatabasePool } from './config/database.js';
 
 const port = Number(process.env.PORT ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {

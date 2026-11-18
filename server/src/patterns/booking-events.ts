@@ -1,4 +1,4 @@
-import type { BookingSnapshot } from '../domain/booking.js';
+import type { BookingSnapshot } from '../models/booking.js';
 
 export type BookingEventType =
   'BOOKING_CREATED' | 'BOOKING_PAID' | 'BOOKING_CANCELLED' | 'BOOKING_EXPIRED';

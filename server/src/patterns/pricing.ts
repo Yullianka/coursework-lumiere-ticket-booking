@@ -1,4 +1,3 @@
-/** All monetary values are integer kopecks; promotions do not stack. */
 export interface DiscountContext {
   readonly studentVerified: boolean;
   readonly now: number;
@@ -68,7 +67,6 @@ export class PricingService {
   }
 
   calculate(basePrice: number, context: DiscountContext): Price {
-    // The bound also keeps percentage multiplication within safe integer arithmetic.
     if (!Number.isSafeInteger(basePrice) || basePrice < 0 || basePrice > 1_000_000_000) {
       throw new Error('Price must be an integer from 0 to 1,000,000,000 kopecks.');
     }

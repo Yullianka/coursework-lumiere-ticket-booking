@@ -1,15 +1,11 @@
-import { Booking } from '../domain/booking.js';
-import { PricingService, type DiscountContext } from '../domain/pricing.js';
+import { Booking } from '../models/booking.js';
+import { PricingService, type DiscountContext } from '../patterns/pricing.js';
 import {
   BookingEventPublisher,
   type BookingEventType,
   type ObserverFailure,
-} from './booking-events.js';
+} from '../patterns/booking-events.js';
 
-/** Implementations must atomically check inventory and persist the booking.
- * A transition must compare the previous status/version and reject stale writes.
- * Database failure must roll back the booking, tickets and inventory together.
- */
 export interface BookingRepository {
   save(next: Booking, previous?: Booking): Promise<void>;
 }
@@ -26,7 +22,6 @@ export class BookingService {
     private readonly clock: () => number = Date.now,
   ) {}
 
-  /** Inputs must come from trusted catalog/account data, not directly from HTTP JSON. */
   async reserve(input: {
     userId: string;
     sessionId: string;

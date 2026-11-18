@@ -1,6 +1,6 @@
-import { inTransaction, type DatabasePool } from './database.js';
-import { seed } from './migrations.js';
-import { lockInventory } from './booking-repository.js';
+import { lockInventory } from '../repositories/booking-repository.js';
+import { inTransaction, type DatabasePool } from '../config/database.js';
+import { seed } from '../config/migrations.js';
 
 const fixtureId = (kind: number, number: number) =>
   `${kind}0000000-0000-4000-8000-${String(number).padStart(12, '0')}`;
