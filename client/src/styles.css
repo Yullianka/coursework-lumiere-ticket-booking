@@ -495,6 +495,7 @@ small {
 }
 .filter-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: end;
   margin: 26px 0;

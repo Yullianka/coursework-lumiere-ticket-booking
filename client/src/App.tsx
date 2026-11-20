@@ -1,22 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import {
-  api,
-  money,
-  when,
-  category,
-  type User,
-  type Session,
-  type Seat,
-  type Booking,
-} from './api';
-import { Admin } from './Admin';
-import { Modal } from './Modal';
-const states: Record<string, string> = {
-  PENDING: 'Очікує оплати',
-  PAID: 'Оплачено',
-  CANCELLED: 'Скасовано',
-  EXPIRED: 'Час вичерпано',
-};
+import { useEffect, useState } from 'react';
+import { Admin } from './features/admin/Admin';
+import { Auth } from './features/auth/Auth';
+import { Bookings } from './features/bookings/Bookings';
+import { SeatPicker } from './features/catalog/SeatPicker';
+import { api, money, when, type Session, type User } from './shared/api';
+
 export function App() {
   const [user, setUser] = useState<User | null>(null),
     [page, setPage] = useState('afisha'),
@@ -27,6 +15,7 @@ export function App() {
   const [kind, setKind] = useState('ALL'),
     [search, setSearch] = useState(''),
     [day, setDay] = useState(''),
+    [sort, setSort] = useState('date_asc'),
     [selected, setSelected] = useState<Session | null>(null),
     [version, setVersion] = useState(0);
   useEffect(() => {
@@ -40,30 +29,30 @@ export function App() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    api<Session[]>('/sessions')
-      .then((r) => {
-        if (active) {
-          setSessions(r);
-          setError('');
-        }
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    const query = new URLSearchParams({ sort });
+    if (kind !== 'ALL') query.set('type', kind);
+    if (search.trim()) query.set('search', search.trim());
+    if (day) query.set('day', day);
+    const timer = setTimeout(() => {
+      void api<Session[]>('/sessions?' + query.toString())
+        .then((r) => {
+          if (active) {
+            setSessions(r);
+            setError('');
+          }
+        })
+        .catch((e) => {
+          if (active) setError(e.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 250);
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [version]);
-  const visible = sessions.filter(
-    (s) =>
-      (kind === 'ALL' || s.type === kind) &&
-      s.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
-      (!day ||
-        new Date(s.starts_at).toLocaleDateString('sv-SE', { timeZone: 'Europe/Kyiv' }) === day),
-  );
+  }, [version, kind, search, day, sort]);
   return (
     <>
       <a className="skip" href="#main">
@@ -208,14 +197,23 @@ export function App() {
                   Дата
                   <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
                 </label>
+                <label>
+                  Сортування
+                  <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                    <option value="date_asc">Спочатку найближчі</option>
+                    <option value="date_desc">Спочатку пізніші</option>
+                    <option value="price_asc">Від дешевших</option>
+                    <option value="price_desc">Від дорожчих</option>
+                  </select>
+                </label>
               </div>
               {loading ? (
                 <p role="status" className="empty">
                   Завантажуємо афішу…
                 </p>
-              ) : visible.length ? (
+              ) : sessions.length ? (
                 <div className="event-grid">
-                  {visible.map((s, i) => (
+                  {sessions.map((s, i) => (
                     <article className="event-card" key={s.id}>
                       <div className={`event-art art-${i % 3}`} aria-hidden="true">
                         <span>{s.type === 'FILM' ? 'CINEMA' : 'THEATRE'}</span>
@@ -337,440 +335,5 @@ export function App() {
         />
       )}
     </>
-  );
-}
-function Auth({ close, done }: { close: () => void; done: () => Promise<void> }) {
-  const [register, setRegister] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget));
-    setBusy(true);
-    setError('');
-    try {
-      await api(`/auth/${register ? 'register' : 'login'}`, 'POST', data);
-      await done();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal onClose={close} locked={busy}>
-      <section
-        className="dialog auth-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auth-title"
-      >
-        <button className="close" aria-label="Закрити" disabled={busy} onClick={close}>
-          ×
-        </button>
-        <p className="eyebrow">ВАШ ПРОСТІР LUMIÈRE</p>
-        <h2 id="auth-title">{register ? 'Раді знайомству' : 'З поверненням'}</h2>
-        <p className="muted">Збережіть місце для наступної історії.</p>
-        <form onSubmit={submit}>
-          {register && (
-            <label>
-              Ваше ім’я
-              <input autoFocus name="displayName" autoComplete="name" maxLength={100} required />
-            </label>
-          )}
-          <label>
-            Електронна пошта
-            <input
-              autoFocus={!register}
-              name="email"
-              type="email"
-              autoComplete="email"
-              maxLength={254}
-              required
-            />
-          </label>
-          <label>
-            Пароль
-            <input
-              name="password"
-              type="password"
-              autoComplete={register ? 'new-password' : 'current-password'}
-              minLength={8}
-              maxLength={128}
-              required
-            />
-          </label>
-          {register && (
-            <small>Щонайменше 8 символів. Студентський статус підтверджує адміністратор.</small>
-          )}
-          {error && (
-            <p className="notice error" role="alert">
-              {error}
-            </p>
-          )}
-          <button className="primary" disabled={busy}>
-            {busy ? 'Зачекайте…' : register ? 'Створити акаунт' : 'Увійти'}
-          </button>
-        </form>
-        <button
-          className="text-button"
-          disabled={busy}
-          onClick={() => {
-            setRegister(!register);
-            setError('');
-          }}
-        >
-          {register ? 'Уже маєте акаунт? Увійти' : 'Уперше тут? Зареєструватися'}
-        </button>
-      </section>
-    </Modal>
-  );
-}
-function SeatPicker({
-  session,
-  user,
-  login,
-  close,
-  done,
-}: {
-  session: Session;
-  user: User | null;
-  login: () => void;
-  close: () => void;
-  done: () => void;
-}) {
-  const [seats, setSeats] = useState<Seat[]>([]),
-    [chosen, setChosen] = useState<string[]>([]),
-    [promo, setPromo] = useState(''),
-    [error, setError] = useState(''),
-    [busy, setBusy] = useState(false),
-    [loading, setLoading] = useState(true);
-  function refresh() {
-    return api<{ seats: Seat[] }>(`/sessions/${session.id}/seats`)
-      .then((r) => {
-        setSeats(r.seats);
-        setChosen((old) =>
-          old.filter((id) => r.seats.some((s) => s.id === id && s.status === 'AVAILABLE')),
-        );
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(() => void refresh(), 15000);
-    return () => clearInterval(timer);
-  }, [session.id]);
-  const items = seats.filter((s) => chosen.includes(s.id)),
-    total = items.reduce((sum, s) => sum + s.price_kopecks, 0);
-  async function reserve() {
-    if (!user) {
-      login();
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      await api('/bookings', 'POST', {
-        sessionId: session.id,
-        seatIds: chosen,
-        promoCode: promo.trim() || undefined,
-      });
-      done();
-    } catch (e) {
-      setError((e as Error).message);
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Modal onClose={close} locked={busy}>
-      <section
-        className="dialog seats-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="seat-title"
-      >
-        <button className="close" disabled={busy} aria-label="Закрити" onClick={close}>
-          ×
-        </button>
-        <p className="eyebrow">ОБЕРІТЬ СВОЄ МІСЦЕ</p>
-        <h2 id="seat-title">{session.title}</h2>
-        <p className="muted">
-          {when(session.starts_at)} · {session.hall_name}
-        </p>
-        <div className="seat-layout">
-          <div>
-            <div className="screen">СЦЕНА / ЕКРАН</div>
-            {loading ? (
-              <p role="status">Завантажуємо схему…</p>
-            ) : (
-              <div className="seat-map" aria-label="Схема залу">
-                {[...new Set(seats.map((s) => s.row_number))].map((row) => (
-                  <div className="seat-row" key={row}>
-                    <span className="row-label">{row}</span>
-                    {seats
-                      .filter((s) => s.row_number === row)
-                      .map((s) => (
-                        <button
-                          key={s.id}
-                          className={`seat ${s.category.toLowerCase()} ${chosen.includes(s.id) ? 'selected' : ''}`}
-                          disabled={s.status !== 'AVAILABLE' || busy}
-                          aria-pressed={chosen.includes(s.id)}
-                          aria-label={`Ряд ${row}, місце ${s.seat_number}, ${category[s.category]}, ${money(s.price_kopecks)}, ${s.status === 'AVAILABLE' ? 'вільне' : 'зайняте'}`}
-                          title={`${category[s.category]} · ${money(s.price_kopecks)}`}
-                          onClick={() =>
-                            setChosen((old) =>
-                              old.includes(s.id)
-                                ? old.filter((id) => id !== s.id)
-                                : old.length < 8
-                                  ? [...old, s.id]
-                                  : old,
-                            )
-                          }
-                        >
-                          {s.seat_number}
-                        </button>
-                      ))}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="legend">
-              <span>
-                <i className="standard" />
-                Стандарт
-              </span>
-              <span>
-                <i className="vip" />
-                VIP
-              </span>
-              <span>
-                <i className="balcony" />
-                Балкон
-              </span>
-              <span>
-                <i className="occupied" />
-                Зайняте
-              </span>
-              <span>
-                <i className="selected" />
-                Ваш вибір
-              </span>
-            </div>
-            <button className="text-button" onClick={() => void refresh()}>
-              Оновити наявність
-            </button>
-          </div>
-          <aside className="order-summary">
-            <h3>Ваш вечір</h3>
-            {items.length ? (
-              items.map((s) => (
-                <div className="summary-line" key={s.id}>
-                  <span>
-                    Ряд {s.row_number}, місце {s.seat_number}
-                    <small>{category[s.category]}</small>
-                  </span>
-                  <b>{money(s.price_kopecks)}</b>
-                </div>
-              ))
-            ) : (
-              <p className="muted">
-                Натисніть на вільне місце на схемі. До 8 місць за одне бронювання.
-              </p>
-            )}
-            <label>
-              Промокод
-              <input
-                value={promo}
-                maxLength={32}
-                onChange={(e) => setPromo(e.target.value)}
-                placeholder="Якщо маєте"
-              />
-            </label>
-            <div className="summary-line total">
-              <span>Без знижок</span>
-              <strong>{money(total)}</strong>
-            </div>
-            <p className="small-note">
-              {user?.student_verified ? 'Вашу студентську знижку 10% підтверджено. ' : ''}
-              Найвигіднішу доступну знижку застосуємо під час бронювання. Остаточна сума — перед
-              оплатою.
-            </p>
-            {error && (
-              <p className="notice error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="primary" disabled={!chosen.length || busy} onClick={reserve}>
-              {busy ? 'Бронюємо…' : user ? 'Забронювати ↗' : 'Увійти для бронювання'}
-            </button>
-            <p className="small-note">
-              Місця зберігаються 15 хвилин, але не пізніше початку сеансу.
-            </p>
-          </aside>
-        </div>
-      </section>
-    </Modal>
-  );
-}
-function Bookings({ onBrowse }: { onBrowse: () => void }) {
-  const [rows, setRows] = useState<Booking[]>([]),
-    [error, setError] = useState(''),
-    [loading, setLoading] = useState(true),
-    [busy, setBusy] = useState(''),
-    [now, setNow] = useState(Date.now()),
-    [confirm, setConfirm] = useState<Booking | null>(null);
-  const refresh = () =>
-    api<Booking[]>('/bookings/mine')
-      .then(setRows)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(() => void refresh(), 15000),
-      clock = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      clearInterval(timer);
-      clearInterval(clock);
-    };
-  }, []);
-  async function act(b: Booking, action: string) {
-    setBusy(b.id);
-    setError('');
-    try {
-      await api(`/bookings/${b.id}/${action}`, 'POST', {});
-      setConfirm(null);
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-      setConfirm(null);
-      await refresh();
-    } finally {
-      setBusy('');
-    }
-  }
-  return (
-    <section className="workspace wrap">
-      <p className="eyebrow">ОСОБИСТИЙ КАБІНЕТ</p>
-      <div className="section-heading">
-        <h1>Мої квитки</h1>
-        <button className="outline" onClick={() => void refresh()}>
-          Оновити
-        </button>
-      </div>
-      {error && (
-        <p className="notice error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading ? (
-        <p role="status">Завантажуємо…</p>
-      ) : !rows.length ? (
-        <div className="empty">
-          <h3>Ваша перша історія попереду</h3>
-          <p>Заброньовані місця та квитки з’являться тут.</p>
-          <button className="primary" onClick={onBrowse}>
-            Переглянути афішу ↗
-          </button>
-        </div>
-      ) : (
-        <div className="booking-list">
-          {rows.map((b) => {
-            const remaining = Math.max(
-              0,
-              Math.ceil((new Date(b.expires_at).getTime() - now) / 1000),
-            );
-            return (
-              <article className={`booking-card ${b.status.toLowerCase()}`} key={b.id}>
-                <div className="booking-heading">
-                  <div>
-                    <span className={`badge ${b.status.toLowerCase()}`}>{states[b.status]}</span>
-                    <h2>{b.title}</h2>
-                    <p>
-                      {when(b.starts_at)} · {b.hall_name}
-                    </p>
-                  </div>
-                  <strong className="booking-price">{money(b.total_kopecks)}</strong>
-                </div>
-                <div className="ticket-items">
-                  {b.items.map((item) => (
-                    <div key={item.id}>
-                      <strong>
-                        Ряд {item.row} · Місце {item.seat}
-                      </strong>
-                      <span>
-                        {category[item.category]} · {money(item.price)}
-                        {item.discount !== 'NONE' &&
-                          ` · ${item.discount === 'STUDENT' ? 'Студентська' : 'Акційна'} знижка`}
-                      </span>
-                      {item.ticketId && <code>Квиток: {item.ticketId}</code>}
-                    </div>
-                  ))}
-                </div>
-                {b.status === 'PENDING' && (
-                  <div className="booking-actions">
-                    <p role="timer">
-                      До оплати:{' '}
-                      <b>
-                        {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
-                      </b>
-                    </p>
-                    <button
-                      className="primary"
-                      disabled={!!busy || !remaining}
-                      onClick={() => setConfirm(b)}
-                    >
-                      Оплатити {money(b.total_kopecks)}
-                    </button>
-                    <button
-                      className="outline"
-                      disabled={!!busy}
-                      onClick={() => void act(b, 'cancel')}
-                    >
-                      Скасувати
-                    </button>
-                  </div>
-                )}
-                {b.status === 'PAID' && (
-                  <p className="small-note">
-                    Квитки збережено у вашому кабінеті.{' '}
-                    <button className="text-button" onClick={() => window.print()}>
-                      Друкувати квитки
-                    </button>
-                  </p>
-                )}
-                <small className="muted">Бронювання {b.id}</small>
-              </article>
-            );
-          })}
-        </div>
-      )}
-      {confirm && (
-        <Modal onClose={() => setConfirm(null)} locked={!!busy}>
-          <section
-            className="dialog auth-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pay-title"
-          >
-            <h2 id="pay-title">Підтвердження оплати</h2>
-            <p>{confirm.title}</p>
-            <h3>{money(confirm.total_kopecks)}</h3>
-            <p>
-              Це навчальна демонстрація. Банківські дані не потрібні, кошти не списуються. Після
-              підтвердження місця отримають статус проданих.
-            </p>
-            <button className="primary" disabled={!!busy} onClick={() => void act(confirm, 'pay')}>
-              {busy ? 'Обробляємо…' : 'Підтвердити демооплату'}
-            </button>
-            <button className="text-button" disabled={!!busy} onClick={() => setConfirm(null)}>
-              Повернутися
-            </button>
-          </section>
-        </Modal>
-      )}
-    </section>
   );
 }
